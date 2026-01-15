@@ -27,8 +27,8 @@
 
         <!-- Phase 1: Foreground capture service (we create this class next) -->
         <service
-            android:name=".CaptureService"
-            android:exported="false"
+             android:name=".CaptureService"
+             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
     </application>

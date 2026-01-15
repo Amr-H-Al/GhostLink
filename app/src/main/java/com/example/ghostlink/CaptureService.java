@@ -1,11 +1,13 @@
 package com.example.ghostlink;
 
+import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
@@ -22,6 +24,13 @@ public class CaptureService extends Service {
     public static final String ACTION_START = "com.example.ghostlink.action.START";
     public static final String ACTION_STOP  = "com.example.ghostlink.action.STOP";
 
+    public static final String EXTRA_RESULT_CODE = "extra_result_code";
+    public static final String EXTRA_RESULT_DATA = "extra_result_data";
+
+    public static final String ACTION_STATUS = "com.example.ghostlink.action.STATUS";
+    public static final String EXTRA_IS_SCANNING = "extra_is_scanning";
+
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -34,21 +43,53 @@ public class CaptureService extends Service {
         String action = (intent != null) ? intent.getAction() : null;
         Log.d(TAG, "CaptureService onStartCommand() action=" + action);
 
+        // Stop request
         if (ACTION_STOP.equals(action)) {
+            broadcastScanning(false);
+
             stopSelf();
             return START_NOT_STICKY;
         }
 
-        // Default behavior: start foreground with a persistent notification
-        startForeground(NOTIF_ID, buildNotification());
+        // Only start if we have MediaProjection permission result
+        if (ACTION_START.equals(action)) {
+            int resultCode = (intent != null)
+                    ? intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
+                    : Activity.RESULT_CANCELED;
 
-        // Phase 1 later: MediaProjection setup + VirtualDisplay + ImageReader
+            Intent resultData = (intent != null)
+                    ? intent.getParcelableExtra(EXTRA_RESULT_DATA)
+                    : null;
 
-        return START_STICKY;
+            if (resultCode != Activity.RESULT_OK || resultData == null) {
+                Log.e(TAG, "Missing MediaProjection permission data. Not starting foreground service.");
+                stopSelf();
+                return START_NOT_STICKY;
+            }
+
+            Notification notif = buildNotification();
+
+            // On Android 10+ you can (and should) specify the FGS type in startForeground(...)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION);
+            } else {
+                startForeground(NOTIF_ID, notif);
+            }
+            broadcastScanning(true);
+
+
+            // Phase 1 next: create MediaProjection + VirtualDisplay + ImageReader
+            return START_STICKY;
+        }
+
+        // Unknown action or null intent -> don't run
+        stopSelf();
+        return START_NOT_STICKY;
     }
 
     @Override
     public void onDestroy() {
+        broadcastScanning(false);
         super.onDestroy();
         Log.d(TAG, "CaptureService onDestroy()");
         // Phase 1 later: release MediaProjection / VirtualDisplay / ImageReader here
@@ -75,7 +116,6 @@ public class CaptureService extends Service {
     }
 
     private Notification buildNotification() {
-        // Stop action intent
         Intent stopIntent = new Intent(this, CaptureService.class);
         stopIntent.setAction(ACTION_STOP);
 
@@ -99,5 +139,11 @@ public class CaptureService extends Service {
                         stopPendingIntent
                 ))
                 .build();
+    }
+    private void broadcastScanning(boolean scanning) {
+    Intent i = new Intent(ACTION_STATUS);
+    i.setPackage(getPackageName()); // keeps broadcast inside your app
+    i.putExtra(EXTRA_IS_SCANNING, scanning);
+    sendBroadcast(i);
     }
 }
