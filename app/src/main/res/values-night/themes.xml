@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Base.Theme.GhostLink" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <item name="colorPrimary">@color/ghost_bg</item>
+        <item name="colorPrimaryVariant">@color/ghost_surface</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="android:statusBarColor">@color/ghost_bg</item>
+        <item name="android:navigationBarColor">@color/ghost_bg</item>
+        <item name="android:windowBackground">@color/ghost_bg</item>
+    </style>
+</resources>
